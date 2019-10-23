@@ -12,7 +12,7 @@ class MyLauncher(SageMakerRayLauncher):
     def get_experiment_config(self):
         return {
             "training": {
-                "env": "NewsVendor-v1",
+                "env": "NewsVendorGymEnvironment-v1",
                 "run": "PPO",
                 "config": {
                     "ignore_worker_failures": True,
