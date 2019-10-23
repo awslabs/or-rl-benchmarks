@@ -1,11 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Jan 14 2018
-
-@author: maggiara
-"""
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import print_function
 
 import gym
 import numpy as np
@@ -31,41 +26,20 @@ class NewsVendorGymEnvironment(gym.Env):
     def render(self, mode='human'):
         pass
 
-    def __init__(self, env_config={}):
-
-        config_defaults = {'lead_time': 5,
-                           'discount_factor': 0.99
-                           }
-
-        for key, val in config_defaults.items():
-            val = env_config.get(key, val)  # Override defaults with constructor parameters
-            self.__dict__[key] = val
-            if key not in env_config:
-                env_config[key] = val
-
+    def __init__(self, config={}):
+        self.l = config.get("lead time", 5)
+        self.gamma = config.get("discount factor", 1)
         self.max_level = 4000
         self.max_action = 2000
         self.step_count = 0
         self.max_steps = 40
-
-        # Create Observation Space
-        #
-        # state[0]: on-hand inventory level
-        # state[1]: on-hand inventory + inventory to arrive in 1 period
-        # ...
-        # state[l - 1]: on-hand inventory + all in transit inventory
-        # state[l]: price
-        # state[l+1]: cost
-        # state[l+2]: holding cost
-        # state[l+3]: penalty for lost sale (civ)
-        # state[l+4]: mean demand (assuming Poisson distribution)
 
         self.max_value = 100.
         self.max_holding_cost = 5.
         self.max_loss_goodwill = 10.
         self.max_mean = 200
 
-        self.inv_dim = max(self.lead_time, 1)
+        self.inv_dim = max(self.l, 1)
         space_low = self.inv_dim * [0]
         space_high = self.inv_dim * [self.max_level]
         space_low += 5 * [0]
@@ -95,6 +69,7 @@ class NewsVendorGymEnvironment(gym.Env):
         self.state[self.inv_dim + 2] = holding_cost
         self.state[self.inv_dim + 3] = loss_goodwill
         self.state[self.inv_dim + 4] = mean_demand
+
         return self.state
 
     def break_state(self):
@@ -115,25 +90,25 @@ class NewsVendorGymEnvironment(gym.Env):
         demand_realization = np.random.poisson(mu)
         # Compute Reward
         on_hand = inv_state[0]
-        if self.lead_time == 0:
+        if self.l == 0:
             on_hand += buys
         sales = min(on_hand, demand_realization)
         sales_revenue = p * sales
         overage = max(0, on_hand - demand_realization)
         underage = max(0, demand_realization - on_hand)
         #        purchase_cost = c * buys
-        purchase_cost = self.discount_factor ** self.lead_time * c * buys
+        purchase_cost = self.gamma ** self.l * c * buys
         holding = overage * h
         penalty_lost_sale = k * underage
         reward = sales_revenue - purchase_cost - holding - penalty_lost_sale
 
         new_state = np.copy(self.state)
         buys = max(0, min(self.max_level - on_hand, buys))
-        if self.lead_time > 1:
+        if self.l > 1:
             new_state[:self.inv_dim - 1] = np.copy(self.state[1:self.inv_dim])
-            new_state[self.lead_time - 1] = buys
+            new_state[self.l - 1] = buys
             new_state[0] += overage
-        elif self.lead_time == 1:
+        elif self.l == 1:
             new_state[0] = overage + buys
         else:
             new_state[0] = overage
@@ -142,6 +117,45 @@ class NewsVendorGymEnvironment(gym.Env):
         if self.step_count >= self.max_steps:
             done = True
 
+        # reward = reward/100.0 #reduce rewards to smaller values
         self.state = np.copy(new_state)
         info = {'demand realization': demand_realization, 'sales': sales, 'underage': underage, 'overage': overage}
         return new_state, reward, done, info
+
+
+class NewsVendorGymEnvironmentNormalized(NewsVendorGymEnvironment):
+    def __init__(self, config={}):
+        super().__init__(config)
+
+        self.action_space = spaces.Box(low=np.array([0]), high=np.array([1]), dtype=np.float32)
+
+    def step(self, action):
+        action = np.clip(action[0], 0, 1)
+        action = action * self.max_action
+        #         print('Scalar de-normalized env action ', action)
+        return super().step(np.array([action]))
+
+
+class NewsVendorGymEnvironmentDiscrete(NewsVendorGymEnvironment):
+    def __init__(self, config={}):
+        super().__init__(config)
+        #         print("Max actions: ", self.max_action)
+        self.action_space = spaces.Discrete(self.max_action)
+
+    def step(self, action):
+        action = [action]
+        return super().step(action)
+
+
+if __name__ == "__main__":
+    env = NewsVendorGymEnvironmentDiscrete()
+    initial_state = env.reset()
+    done = False
+    total_reward = 0
+    while not done:
+        action = env.action_space.sample()
+        print("Action: ", action)
+        state, reward, done, info = env.step(action)
+        total_reward += reward
+    env.close()
+    print('Total reward: ', total_reward)
