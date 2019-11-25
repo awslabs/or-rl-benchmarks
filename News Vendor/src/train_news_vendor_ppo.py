@@ -6,8 +6,8 @@ from sagemaker_rl.ray_launcher import SageMakerRayLauncher
 class MyLauncher(SageMakerRayLauncher):
 
     def register_env_creator(self):
-        from news_vendor_environment import NewsVendorGymEnvironmentDiscrete
-        register_env("NewsVendorGymEnvironment-v1", lambda env_config: NewsVendorGymEnvironmentDiscrete(env_config))
+        from news_vendor_environment import NewsVendorGymEnvironmentNormalized
+        register_env("NewsVendorGymEnvironment-v1", lambda env_config: NewsVendorGymEnvironmentNormalized(env_config))
 
     def get_experiment_config(self):
         return {
@@ -19,11 +19,11 @@ class MyLauncher(SageMakerRayLauncher):
                     "gamma": 1,
                     "kl_coeff": 1.0,
                     "num_sgd_iter": 5,
-                    "lr": 0.0001,
+                    "lr": 0.00001,
                     "sgd_minibatch_size": 32768,
                     "train_batch_size": 320000,
                     "model": {
-                        "fcnet_hiddens": [64, 64],
+                        "fcnet_hiddens": [64, 32],
                     },
                     "use_gae": False,
                     "num_workers": (self.num_cpus - 1),

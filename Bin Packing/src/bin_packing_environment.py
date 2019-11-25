@@ -33,7 +33,8 @@ class BinPackingGymEnvironment(gym.Env):
             self.__dict__[key] = val  # Creates variables like self.plot_boxes, self.save_files, etc
             if key not in env_config:
                 env_config[key] = val
-        print(self.item_probabilities)
+        print('Using bin size: ', self.bag_capacity)
+        print('Using items sizes {} \nWith item probabilities {}'.format(self.item_sizes,self.item_probabilities))
         self.csv_file = '/opt/ml/output/intermediate/binpacking.csv'
 
         self.episode_count = 0
